@@ -1,4 +1,5 @@
 import calendar
+import os
 from datetime import datetime
 import pandas as pd
 from src.database.database import get_connection
@@ -59,7 +60,13 @@ def generate_monthly_report(subject_id, year, month):
 
     df.rename(columns={"Percentage": "% Attendance"}, inplace=True)
 
-    file_name = f"Subject_{subject_id}_{year}_{month}_Report.xlsx"
+    reports_dir = os.path.join(os.getcwd(), "reports")
+    os.makedirs(reports_dir, exist_ok=True)
+
+    file_name = os.path.join(
+        reports_dir,
+        f"Subject_{subject_id}_{year}_{month}_Report.xlsx"
+    )
     df.to_excel(file_name, index=False)
 
     print(f"Monthly report generated: {file_name}")
