@@ -1,6 +1,6 @@
+.venv/
 venv/
 __pycache__/
 .env
-*.xlsx
-*.pyc
 .idea/
+*.xlsx

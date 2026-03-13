@@ -1,6 +1,4 @@
-from database import get_connection
-from datetime import datetime
-
+from src.database.database import get_connection
 
 def start_session(subject_id):
     connection = get_connection()

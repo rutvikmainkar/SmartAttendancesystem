@@ -1,5 +1,5 @@
-from attendance_service import start_session, record_attendance, end_session
-from report_service import generate_monthly_report
+from src.services.attendance_service import start_session, record_attendance, end_session
+from src.services.report_service import generate_monthly_report
 from datetime import datetime
 
 
