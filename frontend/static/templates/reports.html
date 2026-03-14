@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<title>Reports</title>
+
+<link rel="stylesheet" href="/static/css/style.css">
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+</head>
+
+<body>
+
+<div class="layout">
+
+<!-- SIDEBAR -->
+
+<div class="sidebar">
+
+<h2>Smart</h2>
+
+<a href="/">🏠 Dashboard</a>
+<a href="/attendance">📸 Attendance</a>
+<a href="/reports">📊 Reports</a>
+
+</div>
+
+<!-- MAIN CONTENT -->
+
+<div class="main">
+
+<h1>Attendance Reports</h1>
+
+<div class="container">
+
+<ul class="report-list">
+
+{% for file in files %}
+
+<li class="report-item">
+
+<span>{{file}}</span>
+
+<a href="/download/{{file}}">
+<button>Download</button>
+</a>
+
+</li>
+
+{% endfor %}
+
+</ul>
+
+<br>
+
+<a href="/">
+<button>Back to Dashboard</button>
+</a>
+
+</div>
+
+</div>
+
+</div>
+
+</body>
+</html>

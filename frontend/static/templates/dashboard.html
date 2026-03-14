@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<title>Smart Attendance</title>
+
+<link rel="stylesheet" href="/static/css/style.css">
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+</head>
+
+<body>
+
+<div class="layout">
+
+<!-- SIDEBAR -->
+
+<div class="sidebar">
+
+<h2>SmartBoard</h2>
+
+<a href="/">🏠 Dashboard</a>
+<a href="/attendance">📸 Attendance</a>
+<a href="/reports">📊 Reports</a>
+
+</div>
+
+<!-- MAIN CONTENT -->
+
+<div class="main">
+
+<h1>Smart Attendance Dashboard</h1>
+
+<div class="container">
+
+<!-- DASHBOARD STATS -->
+
+<div class="stats">
+
+<div class="stat-card">
+<h3>Total Students</h3>
+<p id="studentsCount">0</p>
+</div>
+
+<div class="stat-card">
+<h3>Subjects</h3>
+<p id="subjectsCount">0</p>
+</div>
+
+<div class="stat-card">
+<h3>Sessions Today</h3>
+<p id="sessionsCount">0</p>
+</div>
+
+</div>
+
+<!-- SUBJECT SELECT -->
+
+<div class="top-bar">
+
+<div class="subject-select">
+
+<label>Select Subject:</label>
+
+<select id="subjectSelect">
+<option value="">Loading subjects...</option>
+</select>
+
+</div>
+
+</div>
+
+<!-- ACTION BUTTONS -->
+
+<div class="button-group">
+
+<button onclick="startSession()">Start Session</button>
+<button onclick="endSession()">End Session</button>
+<button onclick="generateReport()">Generate Report</button>
+
+</div>
+
+<!-- NAVIGATION -->
+
+<div class="nav-buttons">
+
+<a href="/attendance">
+<button>Take Attendance</button>
+</a>
+
+<a href="/reports">
+<button>View Reports</button>
+</a>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<script src="/static/js/script.js"></script>
+
+</body>
+</html>

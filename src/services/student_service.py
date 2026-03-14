@@ -1,4 +1,4 @@
-from src.database.database import get_connection
+from src.database.connection import get_connection
 
 
 def add_student(roll_number, full_name):

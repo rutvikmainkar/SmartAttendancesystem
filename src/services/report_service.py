@@ -2,7 +2,7 @@ import calendar
 import os
 from datetime import datetime
 import pandas as pd
-from src.database.database import get_connection
+from src.database.connection import get_connection
 THRESHOLD = 75
 
 

@@ -1,4 +1,4 @@
-from src.database.database import get_connection
+from src.database.connection import get_connection
 
 def start_session(subject_id):
     connection = get_connection()
@@ -41,3 +41,21 @@ def record_attendance(session_id, student_id):
 
 def end_session(session_id):
     print(f"Session {session_id} ended.")
+
+def get_student_attendance(student_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = """
+    SELECT s.date, a.status
+    FROM attendance_records a
+    JOIN attendance_sessions s
+    ON a.session_id = s.session_id
+    WHERE a.student_id = %s
+    """
+
+    cursor.execute(query, (student_id,))
+    results = cursor.fetchall()
+
+    conn.close()
+    return results

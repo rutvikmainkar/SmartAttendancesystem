@@ -1,9 +1,18 @@
 from src.services.attendance_service import start_session, record_attendance, end_session
 from src.services.report_service import generate_monthly_report
+from src.services.attendance_service import get_student_attendance
+
 from datetime import datetime
 
 
 if __name__ == "__main__":
+    student_id = input("Enter student ID: ")
+
+    records = get_student_attendance(student_id)
+
+    for r in records:
+        print(r)
+
 
     subject_id = 1
 
