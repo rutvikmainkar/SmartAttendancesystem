@@ -1,11 +1,9 @@
 from src.database.connection import get_connection
 
-
 def add_student(roll_number, full_name):
     """
     Add a new student to the database.
     """
-
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -22,35 +20,38 @@ def add_student(roll_number, full_name):
 
     print(f"Student {full_name} added successfully")
 
+
 def get_student_by_roll(roll_number):
-        """
-        Fetch a student using roll number.
-        """
+    """
+    Fetch a student using roll number.
+    """
+    connection = get_connection()
+    # Added dictionary=True for easier data handling
+    cursor = connection.cursor(dictionary=True)
 
-        connection = get_connection()
-        cursor = connection.cursor()
+    # Removed the problematic trailing backslash at the end of the query
+    query = """
+    SELECT student_id, roll_number, full_name
+    FROM students
+    WHERE roll_number = %s
+    """
 
-        query = """
-                SELECT student_id, roll_number, full_name
-                FROM students
-                WHERE roll_number = %s \
-                """
+    cursor.execute(query, (roll_number,))
+    student = cursor.fetchone()
 
-        cursor.execute(query, (roll_number,))
-        student = cursor.fetchone()
+    cursor.close()
+    connection.close()
 
-        cursor.close()
-        connection.close()
+    return student
 
-        return student
 
 def list_students():
     """
     Return all students in the system.
     """
-
     connection = get_connection()
-    cursor = connection.cursor()
+    # Added dictionary=True to match the other fetch functions
+    cursor = connection.cursor(dictionary=True)
 
     query = """
     SELECT student_id, roll_number, full_name

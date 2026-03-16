@@ -1,13 +1,14 @@
 from src.database.connection import get_connection
 
+
 def start_session(subject_id):
     connection = get_connection()
     cursor = connection.cursor()
 
     query = """
-    INSERT INTO lecture_sessions (subject_id, session_date, start_time)
-    VALUES (%s, CURDATE(), CURTIME())
-    """
+            INSERT INTO lecture_sessions (subject_id, session_date, start_time)
+            VALUES (%s, CURDATE(), CURTIME()) \
+            """
     cursor.execute(query, (subject_id,))
     connection.commit()
 
@@ -26,36 +27,57 @@ def record_attendance(session_id, student_id):
 
     try:
         query = """
-        INSERT INTO attendance_logs (session_id, student_id, status)
-        VALUES (%s, %s, 'Present')
-        """
+                INSERT INTO attendance_logs (session_id, student_id, status)
+                VALUES (%s, %s, 'Present') \
+                """
         cursor.execute(query, (session_id, student_id))
         connection.commit()
         print(f"Attendance marked for student {student_id}")
     except Exception as e:
         print(f"Could not mark attendance for student {student_id}: {e}")
-
-    cursor.close()
-    connection.close()
+    finally:
+        cursor.close()
+        connection.close()
 
 
 def end_session(session_id):
-    print(f"Session {session_id} ended.")
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    # Adding the UPDATE query to actually close out the session in the DB
+    try:
+        query = """
+                UPDATE lecture_sessions
+                SET end_time = CURTIME()
+                WHERE session_id = %s \
+                """
+        cursor.execute(query, (session_id,))
+        connection.commit()
+        print(f"Session {session_id} ended successfully in the database.")
+    except Exception as e:
+        print(f"Error ending session {session_id}: {e}")
+    finally:
+        cursor.close()
+        connection.close()
+
 
 def get_student_attendance(student_id):
     conn = get_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)  # Added dictionary=True for easier frontend parsing
 
+    # Replaced 'attendance_records' and 'attendance_sessions' with the actual tables
     query = """
-    SELECT s.date, a.status
-    FROM attendance_records a
-    JOIN attendance_sessions s
-    ON a.session_id = s.session_id
-    WHERE a.student_id = %s
-    """
+            SELECT ls.session_date as date, al.status
+            FROM attendance_logs al
+                JOIN lecture_sessions ls \
+            ON al.session_id = ls.session_id
+            WHERE al.student_id = %s \
+            """
 
     cursor.execute(query, (student_id,))
     results = cursor.fetchall()
 
+    cursor.close()
     conn.close()
+
     return results

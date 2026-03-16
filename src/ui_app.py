@@ -1,25 +1,33 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from datetime import datetime
 
-from src.services.attendance_service import start_session, record_attendance, end_session
-from src.services.report_service import generate_monthly_report
+# --- NEW IMPORTS ADDED HERE ---
 from src.database.connection import get_connection
+from src.services.attendance_service import start_session, end_session, record_attendance
+from src.services.report_service import generate_monthly_report
 
+# ------------------------------
 
-# -------- BASE DIRECTORY --------
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+TEMPLATE_DIR = os.path.join(BASE_DIR, "frontend", "templates")
+STATIC_DIR = os.path.join(BASE_DIR, "frontend", "static")
 
 app = Flask(
     __name__,
-    template_folder=os.path.join(BASE_DIR, "frontend/templates"),
-    static_folder=os.path.join(BASE_DIR, "frontend/static")
+    template_folder=TEMPLATE_DIR,
+    static_folder=STATIC_DIR
 )
 
+# --- INITIALIZE GLOBALS ---
+# Note: Using globals works for a local mini-project, but in a production
+# environment, you would want to store this in a user session or the database!
 current_session_id = None
 current_subject_id = None
 
+
+# --------------------------
 
 # ---------------- DASHBOARD ----------------
 @app.route("/")
@@ -30,7 +38,6 @@ def dashboard():
 # ---------------- DASHBOARD STATS API ----------------
 @app.route("/dashboard-stats")
 def dashboard_stats():
-
     connection = get_connection()
     cursor = connection.cursor(dictionary=True)
 
@@ -44,10 +51,10 @@ def dashboard_stats():
 
     # sessions today
     cursor.execute("""
-        SELECT COUNT(*) as count
-        FROM lecture_sessions
-        WHERE DATE(start_time) = CURDATE()
-    """)
+                   SELECT COUNT(*) as count
+                   FROM lecture_sessions
+                   WHERE DATE (start_time) = CURDATE()
+                   """)
     sessions = cursor.fetchone()["count"]
 
     cursor.close()
@@ -69,14 +76,13 @@ def attendance_page():
 # ---------------- GET SUBJECTS ----------------
 @app.route("/subjects")
 def get_subjects():
-
     connection = get_connection()
     cursor = connection.cursor(dictionary=True)
 
     query = """
-    SELECT subject_id, subject_name
-    FROM subjects
-    """
+            SELECT subject_id, subject_name
+            FROM subjects \
+            """
 
     cursor.execute(query)
     subjects = cursor.fetchall()
@@ -90,7 +96,6 @@ def get_subjects():
 # ---------------- START SESSION ----------------
 @app.route("/start-session", methods=["POST"])
 def start_lecture_session():
-
     global current_session_id
     global current_subject_id
 
@@ -101,7 +106,6 @@ def start_lecture_session():
     subject_id = data["subject_id"]
 
     current_subject_id = subject_id
-
     current_session_id = start_session(subject_id)
 
     return jsonify({
@@ -113,15 +117,17 @@ def start_lecture_session():
 # ---------------- END SESSION ----------------
 @app.route("/end-session", methods=["POST"])
 def end_lecture_session():
-
     global current_session_id
+    global current_subject_id
 
     if not current_session_id:
         return jsonify({"message": "No active session"})
 
     end_session(current_session_id)
 
+    # Clear the global state once the session ends
     current_session_id = None
+    current_subject_id = None
 
     return jsonify({"message": "Session ended"})
 
@@ -129,14 +135,13 @@ def end_lecture_session():
 # ---------------- GET STUDENTS ----------------
 @app.route("/students")
 def get_students():
-
     connection = get_connection()
     cursor = connection.cursor(dictionary=True)
 
     query = """
-    SELECT student_id, full_name, roll_number
-    FROM students
-    """
+            SELECT student_id, full_name, roll_number
+            FROM students \
+            """
 
     cursor.execute(query)
     students = cursor.fetchall()
@@ -150,7 +155,6 @@ def get_students():
 # ---------------- MARK ATTENDANCE ----------------
 @app.route("/mark-attendance", methods=["POST"])
 def mark_attendance():
-
     global current_session_id
 
     if not current_session_id:
@@ -166,36 +170,34 @@ def mark_attendance():
 # ---------------- GENERATE REPORT ----------------
 @app.route("/generate-report", methods=["POST"])
 def generate_report():
-
     data = request.json
     subject_id = data["subject_id"]
 
     today = datetime.today()
 
+    # Generating the report and optionally returning the file name to the frontend
     generate_monthly_report(
         subject_id,
         today.year,
         today.month
     )
 
-    return jsonify({"message": "Report generated"})
+    return jsonify({"message": "Report generated! Check the Reports tab."})
 
 
 # ---------------- REPORTS PAGE ----------------
 @app.route("/reports")
 def reports_page():
-
     reports_folder = os.path.join(BASE_DIR, "reports")
-
     files = os.listdir(reports_folder) if os.path.exists(reports_folder) else []
 
     return render_template("reports.html", files=files)
 
 
-# ---------------- DOWNLOAD REPORT ----------------
+# ----------------
+# ----------------
 @app.route("/download/<filename>")
 def download_file(filename):
-
     reports_folder = os.path.join(BASE_DIR, "reports")
 
     return send_from_directory(
