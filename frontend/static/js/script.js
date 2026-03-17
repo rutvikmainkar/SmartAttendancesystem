@@ -165,3 +165,18 @@ window.onload=function(){
         loadSubjects()
     }
 }
+
+// ---------------- START SMART CAMERA ----------------
+function startCamera(){
+    alert("Starting Camera... Please look at the server window.");
+
+    fetch("/start-camera", {
+        method: "POST"
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert(data.message);
+        // Reload the grid/table to show the newly marked students!
+        loadStudents();
+    });
+}

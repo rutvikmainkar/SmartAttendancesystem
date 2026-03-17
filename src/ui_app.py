@@ -6,6 +6,7 @@ from datetime import datetime
 from src.database.connection import get_connection
 from src.services.attendance_service import start_session, end_session, record_attendance
 from src.services.report_service import generate_monthly_report
+from src.services.face_recognition_service import run_smart_camera
 
 # ------------------------------
 
@@ -165,6 +166,22 @@ def mark_attendance():
     record_attendance(current_session_id, student_id)
 
     return jsonify({"message": "Attendance recorded"})
+
+# ---------------- START AUTO CAMERA ----------------
+@app.route("/start-camera", methods=["POST"])
+def start_camera():
+    global current_session_id
+
+    if not current_session_id:
+        return jsonify({"message": "Error: Please start a session on the Dashboard first!"}), 400
+
+    # This will open the local OpenCV window
+    success = run_smart_camera(current_session_id)
+
+    if success:
+        return jsonify({"message": "Camera closed. Attendance captured successfully!"})
+    else:
+        return jsonify({"message": "Error running camera. Check dataset folder."}), 500
 
 
 # ---------------- GENERATE REPORT ----------------
