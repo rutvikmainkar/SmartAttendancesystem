@@ -1,56 +1,45 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-<title>Attendance</title>
-
-<link rel="stylesheet" href="/static/css/style.css">
-
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
-
+    <title>Attendance</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
 </head>
-
 <body>
+    <div class="layout">
+        <div class="sidebar">
+            <h2>SmartBoard</h2>
+            <a href="/">🏠 Dashboard</a>
+            <a href="/attendance">📸 Attendance</a>
+            <a href="/reports">📊 Reports</a>
+        </div>
 
-<div class="layout">
+        <div class="main">
+            <h1>Mark Attendance</h1>
 
-<!-- SIDEBAR -->
+            <div class="container"> <div class="view-toggle">
+                    <button onclick="switchView('list')">📋 List View</button>
+                    <button onclick="switchView('grid')">⬛ Grid View</button>
+                </div>
 
-<div class="sidebar">
+                <div id="listView">
+                    <table id="studentsTable">
+                        <thead>
+                            <tr>
+                                <th>Roll</th>
+                                <th>Name</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
 
-<h2>SmartBoard</h2>
+                <div id="gridView" class="grid-container" style="display:none;"></div>
 
-<a href="/">🏠 Dashboard</a>
-<a href="/attendance">📸 Attendance</a>
-<a href="/reports">📊 Reports</a>
+            </div> </div>
+    </div>
 
-</div>
-
-<!-- MAIN CONTENT -->
-
-<div class="main">
-
-<h1>Mark Attendance</h1>
-
-<table id="studentsTable">
-
-<thead>
-<tr>
-<th>Roll</th>
-<th>Name</th>
-<th>Action</th>
-</tr>
-</thead>
-
-<tbody></tbody>
-
-</table>
-
-</div>
-
-</div>
-
-<script src="/static/js/script.js"></script>
-
+    <script src="/static/js/script.js"></script>
 </body>
 </html>
