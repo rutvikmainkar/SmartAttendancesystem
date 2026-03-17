@@ -214,3 +214,64 @@ align-items:center;
 a{
 text-decoration:none;
 }
+
+/* VIEW TOGGLE */
+
+.view-toggle{
+display:flex;
+justify-content:center;
+gap:15px;
+margin-bottom:25px;
+}
+
+/* GRID VIEW */
+
+.grid-container{
+display:grid;
+grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+gap:18px;
+margin-top:20px;
+}
+
+/* STUDENT CARD (BEFORE CLICK) */
+
+.student-card{
+background:#2F1A39;
+padding:20px;
+border-radius:10px;
+text-align:center;
+cursor:pointer;
+transition:0.25s;
+box-shadow:0 6px 15px rgba(0,0,0,0.35);
+border:2px solid transparent;
+}
+
+/* HOVER EFFECT */
+
+.student-card:hover{
+background:#662249;
+transform:scale(1.05);
+}
+
+/* AFTER CLICK (PRESENT) */
+
+.student-card.present{
+background:#ED9E59;
+color:#1B1931;
+font-weight:600;
+}
+
+/* NAME */
+
+.student-name{
+font-size:14px;
+font-weight:500;
+margin-bottom:5px;
+}
+
+/* ROLL */
+
+.student-roll{
+font-size:12px;
+opacity:0.8;
+}
