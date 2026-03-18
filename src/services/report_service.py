@@ -1,81 +1,116 @@
-import calendar
-import os
-from datetime import datetime
-import pandas as pd
 from src.database.connection import get_connection
 
-THRESHOLD = 75
 
-
-def get_month_date_range(year, month):
-    start_date = datetime(year, month, 1).strftime('%Y-%m-%d')
-    last_day = calendar.monthrange(year, month)[1]
-    end_date = datetime(year, month, last_day).strftime('%Y-%m-%d')
-    return start_date, end_date
-
-
-def generate_monthly_report(subject_id, year, month):
-    start_date, end_date = get_month_date_range(year, month)
-
+def add_student(roll_number, full_name, email=None, phone=None, department=None, year=None):
+    """
+    Add a new student to the database.
+    All columns that exist in the schema are accepted as optional
+    parameters so the function is future-proof without breaking
+    any existing call sites that only pass roll_number + full_name.
+    """
     connection = get_connection()
     cursor = connection.cursor()
 
     query = """
-            SELECT s.roll_number                                                       AS `Roll No`, \
-                   s.full_name                                                         AS `Name`, \
-                   COUNT(DISTINCT ls.session_id)                                       AS `Total Lec`, \
-                   COALESCE(SUM(CASE WHEN al.status = 'Present' THEN 1 ELSE 0 END), 0) AS `Present`, \
-                   COUNT(DISTINCT ls.session_id) - \
-                   COALESCE(SUM(CASE WHEN al.status = 'Present' THEN 1 ELSE 0 END), 0) AS `Absent`, \
-                   ROUND( \
-                           ( \
-                               COALESCE(SUM(CASE WHEN al.status = 'Present' THEN 1 ELSE 0 END), 0) \
-                                   / NULLIF(COUNT(DISTINCT ls.session_id), 0) \
-                               ) * 100, \
-                           2)                                                          AS `Percentage`
-            FROM students s
-                     JOIN enrollments e ON s.student_id = e.student_id
-                     JOIN lecture_sessions ls ON e.subject_id = ls.subject_id
-                     LEFT JOIN attendance_logs al
-                               ON s.student_id = al.student_id
-                                   AND ls.session_id = al.session_id
-            WHERE e.subject_id = %s
-              AND ls.session_date BETWEEN %s AND %s
-            GROUP BY s.student_id, s.roll_number, s.full_name; \
+            INSERT INTO students (roll_number, full_name, email, phone, department, year)
+            VALUES (%s, %s, %s, %s, %s, %s) \
             """
-
-    cursor.execute(query, (subject_id, start_date, end_date))
-    rows = cursor.fetchall()
-
-    if not rows:
-        print("No attendance data found for this month.")
-        # Make sure to close connections before returning early
-        cursor.close()
-        connection.close()
-        return None
-
-    columns = [desc[0] for desc in cursor.description]
-    df = pd.DataFrame(rows, columns=columns)
-
-    df["Status"] = df["Percentage"].apply(
-        lambda x: "Defaulter" if x < THRESHOLD else "OK"
-    )
-
-    df.rename(columns={"Percentage": "% Attendance"}, inplace=True)
-
-    reports_dir = os.path.join(os.getcwd(), "reports")
-    os.makedirs(reports_dir, exist_ok=True)
-
-    file_name = os.path.join(
-        reports_dir,
-        f"Subject_{subject_id}_{year}_{month}_Report.xlsx"
-    )
-    df.to_excel(file_name, index=False)
-
-    print(f"Monthly report generated: {file_name}")
+    cursor.execute(query, (roll_number, full_name, email, phone, department, year))
+    connection.commit()
 
     cursor.close()
     connection.close()
 
-    # Returning the file name so the calling function knows it succeeded
-    return file_name
+    print(f"Student {full_name} added successfully.")
+
+
+def get_student_by_roll(roll_number):
+    """
+    Fetch a student by roll number.
+    Returns a dict or None if not found.
+    """
+    connection = get_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    query = """
+            SELECT student_id, roll_number, full_name, email, phone, department, year
+            FROM students
+            WHERE roll_number = %s
+              AND is_active = 1 \
+            """
+    cursor.execute(query, (roll_number,))
+    student = cursor.fetchone()
+
+    cursor.close()
+    connection.close()
+
+    return student
+
+
+def get_student_by_id(student_id):
+    """
+    Fetch a student by primary key.
+    Useful for face-recognition pipeline where we resolve
+    a student_id after matching the face encoding.
+    """
+    connection = get_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    query = """
+            SELECT student_id, roll_number, full_name, email, phone, department, year, image_path
+            FROM students
+            WHERE student_id = %s
+              AND is_active = 1 \
+            """
+    cursor.execute(query, (student_id,))
+    student = cursor.fetchone()
+
+    cursor.close()
+    connection.close()
+
+    return student
+
+
+def list_students(active_only=True):
+    """
+    Return all students. Pass active_only=False to include
+    deactivated/graduated students.
+    """
+    connection = get_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    query = """
+        SELECT student_id, roll_number, full_name, department, year
+        FROM students
+        {}
+        ORDER BY roll_number
+    """.format("WHERE is_active = 1" if active_only else "")
+
+    cursor.execute(query)
+    students = cursor.fetchall()
+
+    cursor.close()
+    connection.close()
+
+    return students
+
+
+def deactivate_student(student_id):
+    """
+    Soft-delete a student by setting is_active = 0.
+    Their attendance history is preserved.
+    """
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+                   UPDATE students
+                   SET is_active = 0
+                   WHERE student_id = %s
+                   """, (student_id,))
+    connection.commit()
+
+    cursor.close()
+    connection.close()
+
+    print(f"Student {student_id} deactivated.")

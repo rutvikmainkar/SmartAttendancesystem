@@ -1,21 +1,19 @@
-from src.services.attendance_service import start_session, record_attendance, end_session
+from src.services.attendance_service import start_session, record_attendance, end_session, get_student_attendance
 from src.services.report_service import generate_monthly_report
-from src.services.attendance_service import get_student_attendance
-
 from datetime import datetime
 
-
 if __name__ == "__main__":
-    student_id = input("Enter student ID: ")
-
+    # --- Quick attendance lookup for a student ---
+    student_id = input("Enter student ID to view attendance: ").strip()
     records = get_student_attendance(student_id)
+    if records:
+        for r in records:
+            print(r)
+    else:
+        print("No attendance records found for this student.")
 
-    for r in records:
-        print(r)
-
-
+    # --- Manual test: start a session, mark a few students, end it ---
     subject_id = 1
-
     session_id = start_session(subject_id)
 
     record_attendance(session_id, 1)
@@ -24,5 +22,6 @@ if __name__ == "__main__":
 
     end_session(session_id)
 
+    # --- Generate a report for the current month ---
     today = datetime.today()
     generate_monthly_report(subject_id, today.year, today.month)
