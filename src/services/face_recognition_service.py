@@ -8,8 +8,9 @@ import time
 from src.database.connection import get_connection
 from src.services.attendance_service import record_attendance
 
-# Pointing to the static images folder you set up earlier
-DATASET = os.path.join(os.getcwd(), "frontend", "static", "images")
+# This dynamically finds the root 'Smart_Attendance' folder no matter where you run the script from!
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DATASET = os.path.join(BASE_DIR, "frontend", "static", "images")
 
 
 def run_smart_camera(session_id):
@@ -41,6 +42,12 @@ def run_smart_camera(session_id):
         os.makedirs(DATASET)
         print(f"[WARNING] Created {DATASET}. Please add folders named by roll number.")
         return False
+
+    print("\n--- 🔍 DEBUG INFO ---")
+    print(f"1. Looking in folder: {DATASET}")
+    print(f"2. Roll Numbers in DB: {list(student_map.keys())}")
+    print(f"3. Folders found: {os.listdir(DATASET)}")
+    print("----------------------\n")
 
     for roll_number in os.listdir(DATASET):
         student_folder = os.path.join(DATASET, roll_number)
