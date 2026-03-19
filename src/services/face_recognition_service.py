@@ -4,6 +4,7 @@ import face_recognition
 import numpy as np
 from datetime import datetime
 import time
+import pickle
 
 from src.database.connection import get_connection
 from src.services.attendance_service import record_attendance
@@ -42,6 +43,27 @@ def run_smart_camera(session_id):
         print(f"[WARNING] Created {DATASET}. Please add folders named by roll number.")
         return False
 
+    # Count total images to detect changes (cache invalidation)
+    total_images_count = sum(
+        len([f for f in os.listdir(os.path.join(DATASET, d)) if not f.startswith('.')])
+        for d in os.listdir(DATASET) if os.path.isdir(os.path.join(DATASET, d))
+    )
+
+    CACHE_FILE = os.path.join(DATASET, "encodings_cache.pkl")
+    cache_loaded = False
+
+    if os.path.exists(CACHE_FILE):
+        try:
+            with open(CACHE_FILE, "rb") as f:
+                data = pickle.load(f)
+                if data.get("image_count") == total_images_count:
+                    known_encodings = data["encodings"]
+                    known_roll_numbers = data["roll_numbers"]
+                    cache_loaded = True
+                    print("\n[INFO] Fast Startup: Math skipped, loaded from cache!")
+        except Exception:
+            pass
+
     for roll_number in os.listdir(DATASET):
         student_folder = os.path.join(DATASET, roll_number)
 
@@ -51,31 +73,49 @@ def run_smart_camera(session_id):
 
         student_paths[roll_number] = student_folder
 
-        for img_name in os.listdir(student_folder):
-            # Ignore hidden files like .DS_Store
-            if img_name.startswith('.'):
-                continue
+        # Only run heavy math if cache missed or was outdated
+        if not cache_loaded:
+            for img_name in os.listdir(student_folder):
+                # Ignore hidden files like .DS_Store
+                if img_name.startswith('.'):
+                    continue
 
-            path = os.path.join(student_folder, img_name)
-            image = face_recognition.load_image_file(path)
-            encodings = face_recognition.face_encodings(image)
+                path = os.path.join(student_folder, img_name)
+                image = face_recognition.load_image_file(path)
+                # Build robust encoding by applying jitters
+                encodings = face_recognition.face_encodings(image, num_jitters=5, model="large")
 
-            if len(encodings) > 0:
-                known_encodings.append(encodings[0])
-                known_roll_numbers.append(roll_number)
+                if len(encodings) > 0:
+                    known_encodings.append(encodings[0])
+                    known_roll_numbers.append(roll_number)
+
+    # Save to cache if we just computed them
+    if not cache_loaded and len(known_encodings) > 0:
+        try:
+            with open(CACHE_FILE, "wb") as f:
+                pickle.dump({
+                    "encodings": known_encodings,
+                    "roll_numbers": known_roll_numbers,
+                    "image_count": total_images_count
+                }, f)
+        except Exception:
+            pass
 
     print(f"[INFO] Dataset loaded: {len(known_roll_numbers)} encodings found.")
     print("[INFO] Starting Camera. Press 'Q' to stop.")
 
     # 3. Start Camera Loop
-    cap = cv2.VideoCapture(0)
+    # Use CAP_DSHOW on Windows for instant camera initialization
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    if not cap.isOpened():
+        cap = cv2.VideoCapture(0)
 
     PAUSE_TIME = 900  # 15 minutes
     start_time = time.time()
     paused = False
 
     # Optimization flags & variables
-    process_this_frame = True
+    frame_count = 0
     locations = []
     encodings = []
     face_names = []
@@ -86,10 +126,13 @@ def run_smart_camera(session_id):
             if not ret:
                 break
 
+            frame_count += 1
+
             # --- OPTIMIZATION: Resize and Skip Frames ---
-            if process_this_frame:
-                # Shrink frame to 1/4 size for exponentially faster processing
-                small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+            # Process exactly 1 out of every 5 frames to maximize smoothness
+            if frame_count % 5 == 0:
+                # Shrink frame to 0.4x (catches smaller background faces without huge CPU lag)
+                small_frame = cv2.resize(frame, (0, 0), fx=0.4, fy=0.4)
                 rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
 
                 locations = face_recognition.face_locations(rgb_small_frame)
@@ -97,7 +140,8 @@ def run_smart_camera(session_id):
 
                 face_names = []
                 for face_encoding in encodings:
-                    matches = face_recognition.compare_faces(known_encodings, face_encoding)
+                    # Lower tolerance for strict matching (default 0.6)
+                    matches = face_recognition.compare_faces(known_encodings, face_encoding, tolerance=0.5)
                     face_dist = face_recognition.face_distance(known_encodings, face_encoding)
 
                     name = "UNKNOWN"
@@ -116,41 +160,83 @@ def run_smart_camera(session_id):
                                 record_attendance(session_id, student_id)
 
                                 # Update face dataset if appearance slightly changed
-                                if face_dist[best_match] > 0.45:
+                                if face_dist[best_match] > 0.4:
                                     folder = student_paths[matched_roll]
                                     filename = f"update_{datetime.now().strftime('%H%M%S')}.jpg"
 
-                                    # Scale coordinates back up to 4x to crop from the original HD frame
+                                    # Scale coordinates back up (1 / 0.4 = 2.5) to crop from the original HD frame
                                     top, right, bottom, left = locations[encodings.index(face_encoding)]
-                                    top, right, bottom, left = top * 4, right * 4, bottom * 4, left * 4
+                                    top, right, bottom, left = int(top * 2.5), int(right * 2.5), int(bottom * 2.5), int(left * 2.5)
 
                                     cv2.imwrite(os.path.join(folder, filename), frame[top:bottom, left:right])
                                     print(f"[UPDATE] New face angle saved for {name}")
 
-                    face_names.append(name)
+                    if matched_roll:
+                        face_names.append(f"{name} ({matched_roll})")
+                    else:
+                        face_names.append(name)
 
-            # Toggle the flag to skip the next frame's processing math
-            process_this_frame = not process_this_frame
+            # (Math throttling replaces the old boolean toggle)
 
-            # --- DRAWING RESULTS ON THE FULL-SIZE HD FRAME ---
+            # --- PREMIUM HUD & UI EFFECTS ---
+            # 1. Top status banner with alpha blend
+            overlay = frame.copy()
+            cv2.rectangle(overlay, (0, 0), (frame.shape[1], 55), (20, 20, 20), -1)
+            cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
+            
+            # System text on banner
+            cv2.putText(frame, f"SMART ATTENDANCE SYSTEM | SESSION: {session_id}", (15, 35), 
+                        cv2.FONT_HERSHEY_DUPLEX, 0.6, (255, 255, 255), 1)
+            
+            # Live timestamp on banner
+            live_time = datetime.now().strftime('%b %d | %H:%M:%S')
+            cv2.putText(frame, live_time, (frame.shape[1] - 220, 35), 
+                        cv2.FONT_HERSHEY_DUPLEX, 0.6, (200, 255, 200), 1)
+
+            # Footer hints
+            cv2.putText(frame, "Press 'Q' to Stop Camera", (15, frame.shape[0] - 20), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (150, 150, 150), 1)
+
             for (top, right, bottom, left), name in zip(locations, face_names):
-                # Scale back up face locations since we found them on a 1/4 size frame
-                top *= 4
-                right *= 4
-                bottom *= 4
-                left *= 4
+                # Scale back up face locations (1 / 0.4 = 2.5 multiplier)
+                top = int(top * 2.5)
+                right = int(right * 2.5)
+                bottom = int(bottom * 2.5)
+                left = int(left * 2.5)
 
                 if name == "UNKNOWN":
                     if not unknown_shown:
                         print("[WARNING] Unknown person detected")
                         unknown_shown = True
-                    color = (0, 0, 255)  # Red for Unknown
+                    color = (0, 0, 255)  # Red Alert
+                    status_text = "ACCESS DENIED"
                 else:
-                    color = (0, 255, 0)  # Green for Recognized
+                    color = (0, 255, 0)  # Green Success
+                    status_text = "LOGGED"
 
-                # Draw Box and Label
-                cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
-                cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+                # Sci-Fi Corner Brackets
+                L = min(30, int((right - left) * 0.25))  # Bracket arm length
+                t = 2  # Thickness
+                
+                # Top-Left
+                cv2.line(frame, (left, top), (left + L, top), color, t)
+                cv2.line(frame, (left, top), (left, top + L), color, t)
+                # Top-Right
+                cv2.line(frame, (right, top), (right - L, top), color, t)
+                cv2.line(frame, (right, top), (right, top + L), color, t)
+                # Bottom-Left
+                cv2.line(frame, (left, bottom), (left + L, bottom), color, t)
+                cv2.line(frame, (left, bottom), (left, bottom - L), color, t)
+                # Bottom-Right
+                cv2.line(frame, (right, bottom), (right - L, bottom), color, t)
+                cv2.line(frame, (right, bottom), (right, bottom - L), color, t)
+
+                # Solid Nameplate Background
+                cv2.rectangle(frame, (left, bottom), (right, bottom + 35), color, cv2.FILLED)
+                
+                # Name & Status Labels
+                cv2.putText(frame, name, (left + 5, bottom + 25), cv2.FONT_HERSHEY_DUPLEX, 0.55, (0, 0, 0), 1)
+                cv2.putText(frame, status_text, (left, top - 10), cv2.FONT_HERSHEY_DUPLEX, 0.55, color, 1)
 
             cv2.imshow("Smart Attendance Camera", frame)
 
@@ -176,5 +262,5 @@ def run_smart_camera(session_id):
     # Cleanup
     cap.release()
     cv2.destroyAllWindows()
-    print("\n[STOPPED] Camera Feed Closed.")
+    print("\n[STOPPED] Teacher closed the attendance camera.")
     return True
